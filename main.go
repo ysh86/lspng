@@ -62,9 +62,9 @@ func dumpChunk(chunk io.Reader) {
 	}
 }
 
-func parseChunks(file *os.File) (chunks []io.Reader, err error) {
+func parseChunks(sr *io.SectionReader) (chunks []io.Reader, err error) {
 	signature := make([]byte, 8)
-	n, err := file.Read(signature)
+	n, err := sr.Read(signature)
 	if err != nil || !bytes.Equal(signature, []byte{137, 80, 78, 71, 13, 10, 26, 10}) {
 		return nil, errors.New("invalid signature")
 	}
@@ -72,13 +72,13 @@ func parseChunks(file *os.File) (chunks []io.Reader, err error) {
 	offset := int64(n)
 	for {
 		var length int32
-		err = binary.Read(file, binary.BigEndian, &length)
+		err = binary.Read(sr, binary.BigEndian, &length)
 		if err != nil {
 			break
 		}
 		// chunk = length, type, data, CRC
-		chunks = append(chunks, io.NewSectionReader(file, offset, 4+4+int64(length)+4))
-		offset, err = file.Seek(4+int64(length)+4, 1)
+		chunks = append(chunks, io.NewSectionReader(sr, offset, 4+4+int64(length)+4))
+		offset, err = sr.Seek(4+int64(length)+4, 1)
 		if err != nil {
 			break
 		}
@@ -88,22 +88,33 @@ func parseChunks(file *os.File) (chunks []io.Reader, err error) {
 }
 
 func main() {
-	srcFile := ""
-	if len(os.Args) > 1 {
+	// args
+	var (
+		srcFile string
+	)
+	if len(os.Args) > 1 && os.Args[1] != "-h" {
 		srcFile = os.Args[1]
+	} else {
+		fmt.Printf("Usage of %s:\n", os.Args[0])
+		fmt.Println("  string")
+		fmt.Println("\tsrc file")
+		return
 	}
 
 	file, err := os.Open(srcFile)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
-		os.Exit(1)
+		panic(err)
 	}
 	defer file.Close()
 
-	chunks, err := parseChunks(file)
+	stat, err := file.Stat()
+	if err != nil {
+		panic(err)
+	}
+
+	chunks, err := parseChunks(io.NewSectionReader(file, 0, stat.Size()))
 	if err != io.EOF {
-		fmt.Fprintln(os.Stderr, "error:", err)
-		os.Exit(1)
+		panic(err)
 	}
 	for _, chunk := range chunks {
 		dumpChunk(chunk)
