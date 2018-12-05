@@ -60,6 +60,8 @@ func dumpChunk(chunk io.Reader) {
 	} else {
 		fmt.Printf("\n")
 	}
+
+	// TODO: CRC
 }
 
 func parseChunks(sr *io.SectionReader) (chunks []io.Reader, err error) {
@@ -78,7 +80,7 @@ func parseChunks(sr *io.SectionReader) (chunks []io.Reader, err error) {
 		}
 		// chunk = length, type, data, CRC
 		chunks = append(chunks, io.NewSectionReader(sr, offset, 4+4+int64(length)+4))
-		offset, err = sr.Seek(4+int64(length)+4, 1)
+		offset, err = sr.Seek(4+int64(length)+4, io.SeekCurrent)
 		if err != nil {
 			break
 		}
@@ -95,9 +97,9 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] != "-h" {
 		srcFile = os.Args[1]
 	} else {
-		fmt.Printf("Usage of %s:\n", os.Args[0])
-		fmt.Println("  string")
-		fmt.Println("\tsrc file")
+		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+		fmt.Fprintln(os.Stderr, "  string")
+		fmt.Fprintln(os.Stderr, "\tsrc file")
 		return
 	}
 
